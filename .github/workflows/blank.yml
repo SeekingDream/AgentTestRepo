@@ -1,39 +1,49 @@
-name: Auto Patch from Issue
+name: 🤖 Agent Auto-Fix Issue
 
 on:
   issues:
-    types: [opened]
+    types: [labeled]
 
 jobs:
-  auto-patch:
+  agent-fix:
+    if: github.event.label.name == 'agent:fix'
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout repo
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GH_AGENT_TOKEN }}
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install openai pytest
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
 
-      - name: Set environment variables
-        run: |
-          echo "ISSUE_TITLE=${{ github.event.issue.title }}" >> $GITHUB_ENV
-          echo "ISSUE_BODY=${{ github.event.issue.body }}" >> $GITHUB_ENV
+    - name: 🧠 Generate patch with agent
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        ISSUE_NUMBER: ${{ github.event.issue.number }}
+        REPO: ${{ github.repository }}
+        GH_TOKEN: ${{ secrets.GH_AGENT_TOKEN }}
+      run: |
+        python agent/generate_patch.py
 
-      - name: Generate patch using LLM
-        run: python generate_patch.py
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    - name: 🧪 Run tests
+      run: |
+        python agent/run_tests.py
 
-      - name: Apply patch
-        run: cp patch.py src/module_to_patch.py
-
-      - name: Run tests
-        run: pytest tests/ --maxfail=1 --disable-warnings -q
+    - name: 🔀 Create and merge PR
+      env:
+        GH_TOKEN: ${{ secrets.GH_AGENT_TOKEN }}
+      run: |
+        python agent/create_pr.py
