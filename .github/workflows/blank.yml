@@ -27,7 +27,9 @@ jobs:
 
     - name: Install dependencies
       run: |
-        pip install mini-swe-agent requests
+        git clone https://github.com/SWE-agent/mini-swe-agent.git
+        cd mini-swe-agent
+        pip install -e .
 
     - name: 🧠 Generate patch with MiniSWEAgent
       env:
@@ -35,7 +37,7 @@ jobs:
         REPO: ${{ github.repository }}
         GH_TOKEN: ${{ secrets.GH_AGENT_TOKEN }}
       run: |
-        python agent/generate_patch.py
+        python src/minisweagent/run/extra/github_issue.py https://github.com/SeekingDream/AgentTestRepo/issues/109
         
     - name: 🧪 Run tests
       run: |
