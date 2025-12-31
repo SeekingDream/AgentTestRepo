@@ -49,6 +49,9 @@ jobs:
         REPO: ${{ github.repository }}
         GH_TOKEN: ${{ secrets.GH_AGENT_TOKEN }}
         GOOGLE_APPLICATION_CREDENTIALS: minisweagent/default_credentials.json
+        GOOGLE_CLOUD_PROJECT: triangulate-396717
+        GOOGLE_CLOUD_LOCATION: us-central1
+
       run: |
         ISSUE_URL="https://github.com/${REPO}/issues/${ISSUE_NUMBER}"
     
