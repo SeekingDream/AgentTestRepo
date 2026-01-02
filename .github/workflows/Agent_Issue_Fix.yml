@@ -55,7 +55,8 @@ jobs:
 
       - name: 🧪 Run evaluation script
         run: |
-          docker exec $CONTAINER_NAME bash -c "cd $CONTAINER_DIR && python .agent/test_patch.py" | tee $OUTPUT_FILE
+          docker exec $CONTAINER_NAME bash -c "cd $CONTAINER_DIR && python agent/apply_patch.py && python agent/test_patch.py"  | tee $OUTPUT_FILE
+     
 
       - name: 📤 Extract and Upload Logs
         if: always()
