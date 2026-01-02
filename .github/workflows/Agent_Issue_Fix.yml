@@ -44,7 +44,7 @@ jobs:
     steps:
       - name: ✨ Run Mini-SWE-Agent to generate patch
         run: |
-          python minisweagent/src/minisweagent/run/extra/swebench_single.py \
+          python -m minisweagent.run.extra.swebench_single \
             --subset "lite" \
             --split "test" \
             --instance "astropy__astropy-14182" \
