@@ -5,31 +5,29 @@ on:
     types: [labeled]
 
 jobs:
-  patch-generation:
-    # Only run this job if the label 'agent:fix' was added
+  setup-container:
     if: github.event.label.name == 'agent:fix'
-    
     runs-on: ubuntu-latest
-    
-    env:
-      IMAGE: "swebench/sweb.eval.x86_64.astropy_1776_astropy-14182:latest"
-      CONTAINER_NAME: "sweb_temp"
-      CONTAINER_DIR: "/testbed"
-      OUTPUT_FILE: "output.log"
-
+    outputs:
+      container-name: sweb_temp
+      container-dir: /testbed
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
       - name: 🐳 Start Container
         run: |
-          docker run -d --name $CONTAINER_NAME $IMAGE tail -f /dev/null
+          docker run -d --name sweb_temp swebench/sweb.eval.x86_64.astropy_1776_astropy-14182:latest tail -f /dev/null
 
       - name: 📦 Install dependencies inside container
         run: |
-          docker exec $CONTAINER_NAME bash -c "cd $CONTAINER_DIR && pip install -e . && pip install pytest"
-          docker exec $CONTAINER_NAME bash -c "pip install 'numpy<1.24'"
+          docker exec sweb_temp bash -c "cd /testbed && pip install -e . && pip install pytest"
+          docker exec sweb_temp bash -c "pip install 'numpy<1.24'"
 
+  install-agent:
+    needs: setup-container
+    runs-on: ubuntu-latest
+    steps:
       - name: 🧠 Install Mini-SWE-Agent
         env:
           GH_TOKEN: ${{ secrets.GH_AGENT_TOKEN }}
@@ -37,9 +35,12 @@ jobs:
           git clone https://x-access-token:${GH_TOKEN}@github.com/SeekingDream/minisweagent.git
           cd minisweagent
           pip install -e .
-          pip install datasets
+          pip install datasets google-cloud-aiplatform google-auth
 
-
+  generate-patch:
+    needs: install-agent
+    runs-on: ubuntu-latest
+    steps:
       - name: ✨ Run Mini-SWE-Agent to generate patch
         run: |
           python minisweagent/src/minisweagent/run/extra/swebench_single.py \
@@ -49,25 +50,32 @@ jobs:
             --model "vertex_ai/gemini-2.5-pro" \
             --issue-url "https://github.com/SeekingDream/AgentTestRepo/issues/109"
 
-      - name: 📂 Copy local files to container
+      - name: 📂 Copy files to container
         run: |
-          docker cp ./traj.json $CONTAINER_NAME:$CONTAINER_DIR/traj.json
-          docker cp ./minisweagent/agent $CONTAINER_NAME:$CONTAINER_DIR/agent    
+          docker cp ./traj.json sweb_temp:/testbed/traj.json
+          docker cp ./minisweagent/agent sweb_temp:/testbed/agent
 
-      - name: 🧪 Run evaluation script
+  evaluate-patch:
+    needs: generate-patch
+    runs-on: ubuntu-latest
+    env:
+      OUTPUT_FILE: output.log
+    steps:
+      - name: 🧪 Apply patch & run tests
         run: |
-          docker exec $CONTAINER_NAME bash -c "cd $CONTAINER_DIR && python agent/apply_patch.py && python agent/test_patch.py"  | tee $OUTPUT_FILE
-     
+          docker exec sweb_temp bash -c "cd /testbed && python agent/apply_patch.py && python agent/test_patch.py" | tee $OUTPUT_FILE
 
-      - name: 📤 Extract and Upload Logs
-        if: always()
+  upload-logs-and-comment:
+    needs: evaluate-patch
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📤 Upload evaluation logs
         uses: actions/upload-artifact@v4
         with:
           name: evaluation-log-issue-${{ github.event.issue.number }}
           path: ${{ env.OUTPUT_FILE }}
 
-      - name: 💬 Post Comment to Issue
-        if: always()
+      - name: 💬 Post comment to GitHub issue
         uses: actions/github-script@v7
         with:
           script: |
@@ -79,6 +87,10 @@ jobs:
               body: output
             })
 
+  cleanup:
+    needs: [setup-container, install-agent, generate-patch, evaluate-patch, upload-logs-and-comment]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
       - name: 🧹 Cleanup container
-        if: always()
-        run: docker rm -f $CONTAINER_NAME
+        run: docker rm -f sweb_temp
