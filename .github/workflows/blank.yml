@@ -19,12 +19,17 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-
+        
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-
+        
+    - name: Setup Env
+      run: |
+        cd AgentTestRepo
+        pip install -e .
+    
     - name: Install Agent
       env:
         GH_TOKEN: ${{ secrets.GH_AGENT_TOKEN }}
@@ -43,27 +48,27 @@ jobs:
         EOF
    
 
-    - name: 🧠 Generate patch with MiniSWEAgent
-      env:
-        ISSUE_NUMBER: ${{ github.event.issue.number }}
-        REPO: ${{ github.repository }}
-        GH_TOKEN: ${{ secrets.GH_AGENT_TOKEN }}
-        GOOGLE_APPLICATION_CREDENTIALS: minisweagent/default_credentials.json
-        GOOGLE_CLOUD_PROJECT: triangulate-396717
-        GOOGLE_CLOUD_LOCATION: us-central1
+    # - name: 🧠 Generate patch with MiniSWEAgent
+    #   env:
+    #     ISSUE_NUMBER: ${{ github.event.issue.number }}
+    #     REPO: ${{ github.repository }}
+    #     GH_TOKEN: ${{ secrets.GH_AGENT_TOKEN }}
+    #     GOOGLE_APPLICATION_CREDENTIALS: minisweagent/default_credentials.json
+    #     GOOGLE_CLOUD_PROJECT: triangulate-396717
+    #     GOOGLE_CLOUD_LOCATION: us-central1
 
-      run: |
-        ISSUE_URL="https://github.com/${REPO}/issues/${ISSUE_NUMBER}"
+    #   run: |
+    #     ISSUE_URL="https://github.com/${REPO}/issues/${ISSUE_NUMBER}"
     
-        python minisweagent/src/minisweagent/run/extra/github_issue.py \
-        --issue-url "${ISSUE_URL}" \
-        --yolo \
-        --model "vertex_ai/gemini-2.5-pro"
+    #     python minisweagent/src/minisweagent/run/extra/github_issue.py \
+    #     --issue-url "${ISSUE_URL}" \
+    #     --yolo \
+    #     --model "vertex_ai/gemini-2.5-pro"
 
         
     - name: 🧪 Run tests
       run: |
-        python agent/run_tests.py
+        python .agent/test_patch.py
 
     - name: Commit changes
       run: |
