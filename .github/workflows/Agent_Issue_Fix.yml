@@ -36,6 +36,7 @@ jobs:
           cp default_credentials.json ~/vertexAI.json
           export GOOGLE_CLOUD_PROJECT=triangulate-396717
           export GOOGLE_CLOUD_LOCATION=us-central1
+          export GOOGLE_APPLICATION_CREDENTIALS=~/vertexAI.json
           python -m minisweagent.run.extra.swebench_single \
             --subset "lite" \
             --split "test" \
