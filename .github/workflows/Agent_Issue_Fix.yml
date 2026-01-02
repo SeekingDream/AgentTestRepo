@@ -4,87 +4,47 @@ on:
   issues:
     types: [labeled]
 
+
 jobs:
-  setup-container:
-    if: github.event.label.name == 'agent:fix'
+  patch-evaluation:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: 🐳 Start Container
-        run: |
-          docker run -d --name sweb_temp swebench/sweb.eval.x86_64.astropy_1776_astropy-14182:latest tail -f /dev/null
+      - name: 🐳 Start container
+        run: docker run -d --name sweb_temp swebench/sweb.eval.x86_64.astropy_1776_astropy-14182:latest tail -f /dev/null
 
-      - name: 📦 Install dependencies inside container
+      - name: 📦 Install dependencies in container
         run: |
           docker exec sweb_temp bash -c "cd /testbed && pip install -e . && pip install pytest"
           docker exec sweb_temp bash -c "pip install 'numpy<1.24'"
 
-  generate-patch:
-    needs: setup-container
-    runs-on: ubuntu-latest
-    steps:
-      - name: 🧠 Install Mini-SWE-Agent
+      - name: 🧠 Generate patch
         env:
           GH_TOKEN: ${{ secrets.GH_AGENT_TOKEN }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcloud-key.json
         run: |
           git clone https://x-access-token:${GH_TOKEN}@github.com/SeekingDream/minisweagent.git
           cd minisweagent
           pip install -e .
           pip install datasets google-cloud-aiplatform google-auth
-          cp default_credentials.json ~/vertexAI.json
-          export GOOGLE_CLOUD_PROJECT=triangulate-396717
-          export GOOGLE_CLOUD_LOCATION=us-central1
-          export GOOGLE_APPLICATION_CREDENTIALS=~/vertexAI.json
           python -m minisweagent.run.extra.swebench_single \
             --subset "lite" \
             --split "test" \
             --instance "astropy__astropy-14182" \
             --model "vertex_ai/gemini-2.5-pro" \
             --issue-url "https://github.com/SeekingDream/AgentTestRepo/issues/109"
-        
+
       - name: 📂 Copy files to container
         run: |
           docker cp ./minisweagent/traj.json sweb_temp:/testbed/traj.json
-          docker cp -r ./minisweagent/agent sweb_temp:/testbed/agent
+          docker cp ./minisweagent/agent sweb_temp:/testbed/agent
 
-  evaluate-patch:
-    needs: generate-patch
-    runs-on: ubuntu-latest
-    env:
-      OUTPUT_FILE: output.log
-    steps:
       - name: 🧪 Apply patch & run tests
         run: |
-          docker exec sweb_temp bash -c "cd /testbed && python agent/apply_patch.py && python agent/test_patch.py" | tee $OUTPUT_FILE
+          docker exec sweb_temp bash -c "cd /testbed && python agent/apply_patch.py && python agent/test_patch.py" | tee output.log
 
-  upload-logs-and-comment:
-    needs: evaluate-patch
-    runs-on: ubuntu-latest
-    steps:
-      - name: 📤 Upload evaluation logs
-        uses: actions/upload-artifact@v4
-        with:
-          name: evaluation-log-issue-${{ github.event.issue.number }}
-          path: ${{ env.OUTPUT_FILE }}
-
-      - name: 💬 Post comment to GitHub issue
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const output = `Evaluation for 'agent:fix' completed. [View logs here](${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})`;
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: output
-            })
-
-  cleanup:
-    needs: [setup-container, generate-patch, evaluate-patch, upload-logs-and-comment]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
       - name: 🧹 Cleanup container
+        if: always()
         run: docker rm -f sweb_temp
