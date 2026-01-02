@@ -24,7 +24,7 @@ jobs:
           docker exec sweb_temp bash -c "cd /testbed && pip install -e . && pip install pytest"
           docker exec sweb_temp bash -c "pip install 'numpy<1.24'"
 
-  install-agent:
+  generate-patch:
     needs: setup-container
     runs-on: ubuntu-latest
     steps:
@@ -36,26 +36,18 @@ jobs:
           cd minisweagent
           pip install -e .
           pip install datasets google-cloud-aiplatform google-auth
-          cd ..
-
-  generate-patch:
-    needs: install-agent
-    runs-on: ubuntu-latest
-    steps:
-      - name: ✨ Run Mini-SWE-Agent to generate patch
-        run: |
           python -m minisweagent.run.extra.swebench_single \
             --subset "lite" \
             --split "test" \
             --instance "astropy__astropy-14182" \
             --model "vertex_ai/gemini-2.5-pro" \
             --issue-url "https://github.com/SeekingDream/AgentTestRepo/issues/109"
-
+        
       - name: 📂 Copy files to container
         run: |
           docker cp ./traj.json sweb_temp:/testbed/traj.json
           docker cp ./minisweagent/agent sweb_temp:/testbed/agent
-
+          
   evaluate-patch:
     needs: generate-patch
     runs-on: ubuntu-latest
