@@ -37,6 +37,7 @@ jobs:
         cd minisweagent
         pip install -e .
         pip install google-cloud-aiplatform
+        pip install datasets
     
     - name: Setup mini-swe-agent config
       run: |
