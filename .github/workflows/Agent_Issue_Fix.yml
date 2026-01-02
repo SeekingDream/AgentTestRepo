@@ -36,6 +36,7 @@ jobs:
           cd minisweagent
           pip install -e .
           pip install datasets google-cloud-aiplatform google-auth
+          cd ..
 
   generate-patch:
     needs: install-agent
