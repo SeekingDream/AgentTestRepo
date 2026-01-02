@@ -46,7 +46,7 @@ jobs:
 
       - name: 🧪 Apply patch & run tests
         run: |
-          docker exec sweb_temp bash -c "cd /testbed && python agent/apply_patch.py && python agent/test_patch.py" | tee output.log
+          docker exec sweb_temp bash -c "cd /testbed && python agent/apply_patch.py && cat fix.patch && python agent/test_patch.py" | tee output.log
 
       - name: 🧹 Cleanup container
         if: always()
